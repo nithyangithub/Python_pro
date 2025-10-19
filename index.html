@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalolsavam Items & Participants</title>
+<style>
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background-color: #f8fafc;
+    margin: 20px;
+    color: #111827;
+  }
+  h1 {
+    text-align: center;
+    color: #1e3a8a;
+    margin-bottom: 20px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 10px;
+    text-align: left;
+  }
+  th {
+    background-color: #1d4ed8;
+    color: white;
+  }
+  tr:nth-child(even) {
+    background-color: #f1f5f9;
+  }
+  img {
+    width: 50px;
+    height: 50px;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  .participants-row td {
+    background-color: #eef2ff;
+    padding: 0;
+  }
+  .participants-container {
+    padding: 16px;
+  }
+  thead tr.filters-row th {
+    background-color: #e2e8f0;
+    color: #1e3a8a;
+    padding: 6px;
+  }
+  thead tr.filters-row th:first-child,
+  thead tr.filters-row th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)) {
+    background-color: #eff6ff;
+  }
+  .column-filter {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #cbd5f5;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1f2937;
+    background-color: #fff;
+    box-sizing: border-box;
+  }
+  .column-filter:focus {
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+  .column-filter::placeholder {
+    color: #6b7280;
+  }
+  .participants-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: #1e40af;
+  }
+  .participants-summary .item-name {
+    font-size: 15px;
+  }
+  .participants-summary .item-code {
+    font-size: 14px;
+    color: #1d4ed8;
+  }
+  .participants-summary .type-badge {
+    padding: 2px 10px;
+    border-radius: 9999px;
+    background-color: #2563eb;
+    color: #fff;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .participants-table {
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
+  #itemsTable tbody tr:hover,
+  .participants-table tbody tr:hover {
+    background-color: #e0f2fe;
+  }
+  .show-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .show-btn:hover {
+    background: #059669;
+  }
+</style>
+</head>
+<body>
+
+<h1>Kalolsavam Items & Participants</h1>
+
+<table id="itemsTable">
+  <thead>
+    <tr>
+      <th>Sl.No</th>
+      <th>Vibhagam Name</th>
+      <th>Item Code</th>
+      <th>Item Name</th>
+      <th>Gender</th>
+      <th>Item Type</th>
+      <th>Max Participants</th>
+      <th>Max Pinnani</th>
+      <th>Max Time</th>
+      <th>Participants</th>
+    </tr>
+    <tr class="filters-row">
+      <th></th>
+      <th><input id="filterVibhagam" class="column-filter" type="search" placeholder="Search Vibhagam" aria-label="Filter by Vibhagam" /></th>
+      <th><input id="filterItemCode" class="column-filter" type="search" placeholder="Search Item Code" aria-label="Filter by Item Code" /></th>
+      <th><input id="filterItemName" class="column-filter" type="search" placeholder="Search Item Name" aria-label="Filter by Item Name" /></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+let items = [];
+let participants = [];
+let filteredItems = [];
+let filters = {
+  vibhagam: "",
+  itemCode: "",
+  itemName: ""
+};
+
+// Load default CSV files as soon as the document is ready
+window.addEventListener("DOMContentLoaded", loadDefaultData);
+
+async function loadDefaultData() {
+  try {
+    const [itemsResponse, participantsResponse] = await Promise.all([
+      fetch("items.csv"),
+      fetch("participents.csv")
+    ]);
+
+    if (!itemsResponse.ok || !participantsResponse.ok) {
+      console.warn("Default CSV files could not be loaded. You can still upload files manually.");
+      return;
+    }
+
+    const [itemsText, participantsText] = await Promise.all([
+      itemsResponse.text(),
+      participantsResponse.text()
+    ]);
+
+    const parsedItems = parseCSV(itemsText);
+    const parsedParticipants = parseCSV(participantsText);
+
+    if (parsedItems.length && parsedParticipants.length) {
+      items = parsedItems;
+      participants = parsedParticipants;
+      filteredItems = items;
+      setupColumnFilters();
+      applyFilters();
+    }
+  } catch (error) {
+    console.error("Failed to load default CSV files:", error);
+  }
+}
+
+function setupColumnFilters() {
+  const vibhagamInput = document.querySelector("#filterVibhagam");
+  const itemCodeInput = document.querySelector("#filterItemCode");
+  const itemNameInput = document.querySelector("#filterItemName");
+
+  const bindings = [
+    { element: vibhagamInput, key: "vibhagam" },
+    { element: itemCodeInput, key: "itemCode" },
+    { element: itemNameInput, key: "itemName" }
+  ];
+
+  bindings.forEach(({ element, key }) => {
+    if (!element || element.dataset.bound === "true") return;
+
+    element.addEventListener("input", event => {
+      filters[key] = (event.target.value || "").trim().toLowerCase();
+      applyFilters();
+    });
+
+    element.dataset.bound = "true";
+  });
+}
+
+function applyFilters() {
+  filteredItems = items.filter(item => {
+    const vibhagamValue = (item["Vibhagam Name"] || "").toLowerCase();
+    const itemCodeValue = (item["Item Code"] || "").toLowerCase();
+    const itemNameValue = (item["Item Name"] || "").toLowerCase();
+
+    const matchesVibhagam = !filters.vibhagam || vibhagamValue.includes(filters.vibhagam);
+    const matchesItemCode = !filters.itemCode || itemCodeValue.includes(filters.itemCode);
+    const matchesItemName = !filters.itemName || itemNameValue.includes(filters.itemName);
+
+    return matchesVibhagam && matchesItemCode && matchesItemName;
+  });
+
+  renderItemsTable(filteredItems);
+}
+
+// Parse CSV to array of objects
+function parseCSV(text) {
+  const rows = text
+    .split(/\r?\n/)
+    .map(row => row.trim())
+    .filter(row => row.length)
+    .map(row => row.split(","));
+
+  if (!rows.length) return [];
+
+  const headers = rows[0].map(header => header.trim());
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = (row[index] ?? "").trim();
+    });
+    return obj;
+  });
+}
+
+// Render the items table and attach expand handlers
+function renderItemsTable(itemsData) {
+  const tbody = document.querySelector("#itemsTable tbody");
+  const noResultsRow = document.querySelector(".items-empty-state");
+  tbody.innerHTML = "";
+
+  if (!itemsData.length) {
+    if (!noResultsRow) {
+      const emptyRow = document.createElement("tr");
+      emptyRow.className = "items-empty-state";
+      emptyRow.innerHTML = `<td colspan="10" style="text-align: center; padding: 24px; color: #6b7280;">No items matched your search.</td>`;
+      tbody.appendChild(emptyRow);
+    } else {
+      tbody.appendChild(noResultsRow);
+    }
+    return;
+  }
+
+  let sequence = 1;
+  itemsData.forEach(item => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${sequence++}</td>
+      <td>${item["Vibhagam Name"]}</td>
+      <td>${item["Item Code"]}</td>
+      <td>${item["Item Name"]}</td>
+      <td>${item["Gender"]}</td>
+      <td>${item["Item Type"]}</td>
+      <td>${item["Max Participants"]}</td>
+      <td>${item["Max Pinnani"]}</td>
+      <td>${item["Max Time"]}</td>
+      <td>
+        <button class="show-btn" type="button">Show Participants</button>
+      </td>
+    `;
+
+    row.querySelector(".show-btn").addEventListener("click", () => toggleParticipantsRow(row, item));
+    tbody.appendChild(row);
+  });
+}
+
+// Toggle participants row beneath the selected item row
+function toggleParticipantsRow(itemRow, item) {
+  const existingRow = itemRow.nextElementSibling;
+  const isExpandedRow = existingRow?.classList.contains("participants-row");
+
+  // Collapse if already open
+  if (isExpandedRow) {
+    existingRow.remove();
+    return;
+  }
+
+  // Remove any other expanded rows
+  document.querySelectorAll(".participants-row").forEach(row => row.remove());
+
+  const filteredParticipants = filterParticipantsByItemCode(item["Item Code"] ?? "");
+  const expandedRow = document.createElement("tr");
+  expandedRow.className = "participants-row";
+  expandedRow.innerHTML = `
+    <td colspan="10">
+      <div class="participants-container">
+        ${buildParticipantsHeader(item, filteredParticipants)}
+        ${buildParticipantsTable(filteredParticipants)}
+      </div>
+    </td>
+  `;
+
+  itemRow.insertAdjacentElement("afterend", expandedRow);
+}
+
+// Filter participants based on item code across every item column in the CSV
+function filterParticipantsByItemCode(itemCode) {
+  if (!itemCode) return [];
+
+  const matches = [];
+
+  participants.forEach(participant => {
+    const itemColumns = Object.keys(participant).filter(key => /^item\d+$/i.test(key) || /^\d+$/.test(key));
+
+    let matched = false;
+    let matchedSuffix = null;
+
+    for (const column of itemColumns) {
+      const rawValue = participant[column];
+      if (!rawValue) continue;
+
+      const normalizedValue = rawValue.trim();
+      if (!normalizedValue) continue;
+
+      const suffixMatch = normalizedValue.match(/\((.)\)$/);
+      const suffix = suffixMatch ? suffixMatch[1].toUpperCase() : null;
+      const baseCode = suffix ? normalizedValue.slice(0, -3) : normalizedValue;
+
+      if (baseCode === itemCode) {
+        matched = true;
+        matchedSuffix = suffix;
+        break;
+      }
+    }
+
+    if (matched) {
+      matches.push({ participant, suffix: matchedSuffix });
+    }
+  });
+
+  return matches;
+}
+
+function buildParticipantsHeader(item, filteredParticipants) {
+  const badges = buildTypeBadges(filteredParticipants, item);
+  const itemName = item["Item Name"] ?? "";
+  const itemCode = item["Item Code"] ?? "";
+
+  const badgesMarkup = badges.map(label => `<span class="type-badge">${label}</span>`).join(" ");
+
+  return `
+    <div class="participants-summary">
+      <span class="item-name">${itemName}</span>
+      <span class="item-code">${itemCode}</span>
+      ${badgesMarkup}
+    </div>
+  `;
+}
+
+function buildTypeBadges(filteredParticipants, item) {
+  const labelMap = { G: "Group", S: "Single", P: "Pinnani" };
+  const suffixes = new Set(filteredParticipants.map(entry => entry.suffix).filter(Boolean));
+
+  if (!suffixes.size) {
+    const fallback = (item["Item Type"] || "").trim().toUpperCase();
+    if (fallback) suffixes.add(fallback);
+  }
+
+  return Array.from(suffixes).map(code => labelMap[code] || code);
+}
+
+// Build HTML string for participants table
+function buildParticipantsTable(filteredParticipants) {
+  if (!filteredParticipants.length) {
+    return `<p style="margin: 0; color: #ef4444;">No participants found for this item.</p>`;
+  }
+
+  const rows = filteredParticipants.map(({ participant }, index) => {
+    const admissionNumber = participant["Admn.No"];
+      const photoUrl = `https://ulsavam.kite.kerala.gov.in/2025/kalolsavam-subdistrict-2025/photos/175/17079/17079_${admissionNumber}.jpg`
+    return `
+      <tr>
+        <td>${index + 1}</td>
+        <td><img src="${photoUrl}" alt="Photo"></td>
+        <td>${admissionNumber}</td>
+        <td>${participant["Participant Name"]}</td>
+        <td>${participant["Class"]}</td>
+        <td>${participant["B / G"]}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <table class="participants-table">
+      <thead>
+        <tr>
+          <th>Sl.No</th>
+          <th>Photo</th>
+          <th>Admn.No</th>
+          <th>Participant Name</th>
+          <th>Class</th>
+          <th>B/G</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+}
+</script>
+
+</body>
+</html>
